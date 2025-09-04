@@ -38,7 +38,7 @@ public class Main {
         List<String> pasos = new ArrayList<>();
         int total = 0;
 
-        boolean todosIguales = tiempos.stream().allMatch(t -> t.equals(tiempos.getFirst()));
+        boolean todosIguales = tiempos.getFirst().equals(tiempos.getLast());
         if (todosIguales) {
             int cantidadPersonas = tiempos.size();
             int tiempoComun = tiempos.getFirst();
@@ -56,7 +56,7 @@ public class Main {
         }
 
         while (tiempos.size() > 3) {
-            int masRapido = tiempos.get(0);
+            int masRapido = tiempos.getFirst();
             int segundoMasRapido = tiempos.get(1);
             int segundoMasLento = tiempos.get(tiempos.size() - 2);
             int masLento = tiempos.getLast();
@@ -83,13 +83,13 @@ public class Main {
         }
 
         if (tiempos.size() == 3) {
-            total += tiempos.get(0) + tiempos.get(1) + tiempos.get(2);
-            pasos.add(tiempos.get(0) + " y " + tiempos.get(1) + " cruzan -> (" + tiempos.get(1) + ")");
-            pasos.add(tiempos.get(0) + " regresa <- (" + tiempos.get(0) + ")");
-            pasos.add(tiempos.get(0) + " y " + tiempos.get(2) + " cruzan -> (" + tiempos.get(2) + ")");
+            total += tiempos.getFirst() + tiempos.get(1) + tiempos.get(2);
+            pasos.add(tiempos.getFirst() + " y " + tiempos.get(1) + " cruzan -> (" + tiempos.get(1) + ")");
+            pasos.add(tiempos.getFirst() + " regresa <- (" + tiempos.getFirst() + ")");
+            pasos.add(tiempos.getFirst() + " y " + tiempos.get(2) + " cruzan -> (" + tiempos.get(2) + ")");
         } else if (tiempos.size() == 2) {
             total += tiempos.get(1);
-            pasos.add(tiempos.get(0) + " y " + tiempos.get(1) + " cruzan -> (" + tiempos.get(1) + ")");
+            pasos.add(tiempos.getFirst() + " y " + tiempos.get(1) + " cruzan -> (" + tiempos.get(1) + ")");
         } else if (tiempos.size() == 1) {
             total += tiempos.getFirst();
             pasos.add(tiempos.getFirst() + " cruza solo.");
