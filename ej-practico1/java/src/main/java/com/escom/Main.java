@@ -12,7 +12,7 @@ public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         List<Integer> tiemposPersonas = new ArrayList<>();
-        System.out.println("Ingrese los tiempos de cada persona (positivos):");
+        System.out.println("Ingrese los tiempos de cada persona:");
 
         while (scanner.hasNextInt()) {
             int tiempo = scanner.nextInt();
