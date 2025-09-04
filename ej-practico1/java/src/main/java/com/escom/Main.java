@@ -12,14 +12,15 @@ public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         List<Integer> tiemposPersonas = new ArrayList<>();
-        System.out.println("Ingrese los tiempos de cada persona:");
+        System.out.println("Ingrese los tiempos de cada persona (positivos):");
 
         while (scanner.hasNextInt()) {
             int tiempo = scanner.nextInt();
-            if (tiempo <= 0) {
-                log.warning("El tiempo debe ser positivo.");
-                continue;
+            while (tiempo <= 0) {
+                log.warning("El tiempo debe ser positivo. Ingrese nuevamente:");
+                tiempo = scanner.nextInt();
             }
+
             tiemposPersonas.add(tiempo);
         }
 
