@@ -15,8 +15,8 @@
 
 def cruzar_puente():
     while True:
-        entrada = int(input("Ingrese el número de personas: "))
         try:
+            entrada = int(input("Ingrese el número de personas: "))
             if entrada <= 0:
                 print("\nEl número de personas debe ser mayor que cero.")
                 continue
@@ -27,8 +27,8 @@ def cruzar_puente():
     tiempos = []
     i = 0
     while i < entrada:
-        tiempo = int(input(f"Ingrese el tiempo de la persona {chr(ord('A') + i)}: "))
         try:
+            tiempo = int(input(f"Ingrese el tiempo de la persona {chr(ord('A') + i)}: "))
             if tiempo <= 0:
                 print("\nEl tiempo debe ser un número positivo mayor que cero.")
                 continue
@@ -41,95 +41,125 @@ def cruzar_puente():
     # Genera una lista de nombres: ['A', 'B', 'C', ...] usando código ASCII
     # chr(ord('A') + i) convierte 0 en 'A', 1 en 'B', etc.
     nombres = [chr(ord('A') + i) for i in range(entrada)]
-
     # Une cada nombre con su tiempo usando zip, formando tuplas (nombre, tiempo)
     # Ejemplo: [('A', 1), ('B', 2), ('C', 5), ('D', 8)]
     sujetos = list(zip(nombres, tiempos))
-    sujetos.sort(key=lambda x: x[1])  # Ordenar por tiempo (de menor a mayor)
 
-    # 'pasos' almacenará los movimientos realizados en el cruce, para mostrarlos al final
+    # Crea una lista con la letra y tiempo, tipo par: valor
+    tiempos_map = {n: t for n, t in sujetos}
+
+    # Orilla izquierda: todos al inicio, ordenados por tiempo ascendente
+    izquierda = sorted(sujetos, key=lambda x: x[1])  
     pasos = []
     total = 0
 
-    # 'izquierda' representa las personas que aún no han cruzado el puente (inician todos aquí)
-    izquierda = sujetos.copy()
-    # 'derecha' representa las personas que ya cruzaron el puente (inicia vacío)
-    derecha = []
+    # Permite eliminar elementos de la lista original izquierda  con nonlocal
+    def quitar_de_izquierda(*nombres_quitar):
+        nonlocal izquierda
+        nombres_quitar = set(nombres_quitar)
+        izquierda = [p for p in izquierda if p[0] not in nombres_quitar]
+    
+    # Permite agregar elementos de la lista original izquierda con nonlocal
+    def agregar_a_izquierda(*nombres_agregar):
+        nonlocal izquierda
+        izquierda.extend([(n, tiempos_map[n]) for n in nombres_agregar])
+        izquierda.sort(key=lambda x: x[1])
 
-    # Este ciclo while implementa la estrategia óptima para el cruce:
-    # Mientras queden más de 3 personas en la izquierda, se realizan movimientos en grupos,
-    # comparando dos estrategias posibles y eligiendo la de menor tiempo.
     while len(izquierda) > 3:
-        # Estrategia: comparar dos opciones y elegir la mejorno e
-        # Opción 1: Los dos más rápidos cruzan, el más rápido regresa, los dos más lentos cruzan, el segundo más rápido regresa
-        t1 = izquierda[0][1]
-        t2 = izquierda[1][1]
-        tn_1 = izquierda[-2][1]
-        tn = izquierda[-1][1]
+        a, ta = izquierda[0][0], izquierda[0][1]      # más rápido
+        b, tb = izquierda[1][0], izquierda[1][1]      # segundo más rápido
+        y, ty = izquierda[-2][0], izquierda[-2][1]    # segundo más lento
+        z, tz = izquierda[-1][0], izquierda[-1][1]    # más lento
 
-        # Caso 1: (t2 + t1 + tn + t2)
-        costo1 = t2 + t1 + tn + t2 
-        # Caso 2: (tn + t1 + tn_1 + t1)
-        costo2 = tn + t1 + tn_1 + t1
+        # Dos opciones clásicas:
+        # Opción 1 (a+b cruzan, a regresa, y+z cruzan, b regresa)
+        costo1 = tb + ta + tz + tb
+        # Opción 2 (a+z cruzan, a regresa, a+y cruzan, a regresa)
+        costo2 = tz + ta + ty + ta
 
-        if costo1 < costo2:
-            pasos.append(f"{izquierda[0][0]} y {izquierda[1][0]} cruzan ({t2} min)")
-            total += t2
-            derecha.extend([izquierda[0], izquierda[1]])
-            izquierda = izquierda[2:]
+        if costo1 <= costo2:
+            # a y b cruzan
+            pasos.append(f"{a} y {b} cruzan ({tb} min)")
+            total += tb
+            quitar_de_izquierda(a, b)
 
-            pasos.append(f"{derecha[0][0]} regresa ({t1} min)")
-            total += t1
-            izquierda.insert(0, derecha[0])
-            derecha = derecha[1:]
+            # a regresa
+            pasos.append(f"{a} regresa ({ta} min)")
+            total += ta
+            agregar_a_izquierda(a)
 
-            pasos.append(f"{izquierda[-2][0]} y {izquierda[-1][0]} cruzan ({tn} min)")
-            total += tn
-            derecha.extend([izquierda[-2], izquierda[-1]])
-            izquierda = izquierda[:-2]
+            # y y z cruzan
+            # Releer extremos por si el orden cambió al reinsertar
+            y, ty = izquierda[-2][0], izquierda[-2][1]
+            z, tz = izquierda[-1][0], izquierda[-1][1]
+            pasos.append(f"{y} y {z} cruzan ({tz} min)")
+            total += tz
+            quitar_de_izquierda(y, z)
 
-            pasos.append(f"{derecha[0][0]} regresa ({t2} min)")
-            total += t2
-            izquierda.insert(0, derecha[0])
-            derecha = derecha[1:]
+            # b regresa
+            pasos.append(f"{b} regresa ({tb} min)")
+            total += tb
+            agregar_a_izquierda(b)
+
         else:
-            pasos.append(f"{izquierda[0][0]} y {izquierda[-1][0]} cruzan ({tn} min)")
-            total += tn
-            derecha.extend([izquierda[0], izquierda[-1]])
-            izquierda = izquierda[1:-1]
+            # a y z cruzan
+            pasos.append(f"{a} y {z} cruzan ({tz} min)")
+            total += tz
+            quitar_de_izquierda(a, z)
 
-            pasos.append(f"{derecha[0][0]} regresa ({t1} min)")
-            total += t1
-            izquierda.insert(0, derecha[0])
-            derecha = derecha[1:]
+            # a regresa
+            pasos.append(f"{a} regresa ({ta} min)")
+            total += ta
+            agregar_a_izquierda(a)
 
-            pasos.append(f"{izquierda[0][0]} y {izquierda[-1][0]} cruzan ({tn_1} min)")
-            total += tn_1
-            derecha.extend([izquierda[0], izquierda[-1]])
-            izquierda = izquierda[1:-1]
+            # a y y cruzan
+            # Releer y (segundo más lento actual)
+            y, ty = izquierda[-1][0], izquierda[-1][1]  # tras quitar z, y pasa a ser el más lento actual
+            pasos.append(f"{a} y {y} cruzan ({ty} min)")
+            total += ty
+            quitar_de_izquierda(a, y)
 
-            pasos.append(f"{derecha[0][0]} regresa ({t1} min)")
-            total += t1
-            izquierda.insert(0, derecha[0])
-            derecha = derecha[1:]
+            # a regresa
+            pasos.append(f"{a} regresa ({ta} min)")
+            total += ta
+            agregar_a_izquierda(a)
 
-    # Resolver los últimos 3 o menos
     if len(izquierda) == 3:
-        pasos.append(f"{izquierda[0][0]} y {izquierda[1][0]} cruzan ({izquierda[1][1]} min)")
-        total += izquierda[1][1]
-        pasos.append(f"{izquierda[0][0]} regresa ({izquierda[0][1]} min)")
-        total += izquierda[0][1]
-        pasos.append(f"{izquierda[0][0]} y {izquierda[2][0]} cruzan ({izquierda[2][1]} min)")
-        total += izquierda[2][1]
+        izquierda.sort(key=lambda x: x[1])
+        p1, t1 = izquierda[0]
+        p2, t2 = izquierda[1]
+        p3, t3 = izquierda[2]
+
+        # p1+p2 cruzan
+        pasos.append(f"{p1} y {p2} cruzan ({max(t1, t2)} min)")
+        total += max(t1, t2)
+
+        # p1 regresa
+        pasos.append(f"{p1} regresa ({t1} min)")
+        total += t1
+
+        # p1+p3 cruzan
+        pasos.append(f"{p1} y {p3} cruzan ({max(t1, t3)} min)")
+        total += max(t1, t3)
+
+        izquierda.clear()  # ya cruzaron los 3
+
     elif len(izquierda) == 2:
-        pasos.append(f"{izquierda[0][0]} y {izquierda[1][0]} cruzan ({izquierda[1][1]} min)")
-        total += izquierda[1][1]
+        p1, t1 = izquierda[0]
+        p2, t2 = izquierda[1]
+        pasos.append(f"{p1} y {p2} cruzan ({max(t1, t2)} min)")
+        total += max(t1, t2)
+        izquierda.clear()
+
     elif len(izquierda) == 1:
-        pasos.append(f"{izquierda[0][0]} cruza solo ({izquierda[0][1]} min)")
-        total += izquierda[0][1]
+        p1, t1 = izquierda[0]
+        pasos.append(f"{p1} cruza solo ({t1} min)")
+        total += t1
+        izquierda.clear()
 
     for paso in pasos:
         print(paso)
     print(f"Tiempo total: {total} minutos")
+
 
 cruzar_puente()
