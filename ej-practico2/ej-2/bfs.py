@@ -1,9 +1,8 @@
-# resolver_15puzzle_bfs.py
 import time
 from collections import deque
 from typing import Optional, Tuple, List, Dict, Set
 
-# ==================== Configuración base ====================
+# ------------------------------ Configuración base ------------------------------
 TAMANO_TABLERO: int = 4
 ESTADO_OBJETIVO: Tuple[int, ...] = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS: Tuple[str, ...] = ('arriba', 'abajo', 'izquierda', 'derecha')  # orden determinista
@@ -16,7 +15,7 @@ PAUSA_SEGUNDOS: float = 0.25    # pausa entre pasos al reproducir
 # Seguridad para BFS (evitar cuelgues): puedes subir/bajar este número
 LIMITE_EXPANSIONES_BFS: int = 1_000_000
 
-# ==================== Utilidades de tablero ====================
+# ------------------------------ Utilidades de tablero ------------------------------
 def indice_a_fila_columna(indice: int) -> Tuple[int, int]:
     return divmod(indice, TAMANO_TABLERO)
 
@@ -53,7 +52,7 @@ def imprimir_tablero(estado: Tuple[int, ...]) -> None:
         print(' '.join(f'{x:2d}' if x != 0 else '  .' for x in segmento))
 
 def imprimir_tablero_resaltado(estado: Tuple[int, ...], indice_resaltado: Optional[int] = None) -> None:
-    """Imprime el tablero y resalta (con corchetes) la casilla donde estaba el 0 antes (la ficha que se movió)."""
+    # Imprime el tablero y resalta (con corchetes) la casilla donde estaba el 0 antes (la ficha que se movió).
     for fila in range(TAMANO_TABLERO):
         celdas = []
         for columna in range(TAMANO_TABLERO):
@@ -69,7 +68,7 @@ def limpiar_consola() -> None:
     import os, sys
     os.system('cls' if sys.platform.startswith('win') else 'clear')
 
-# ==================== Solvencia (4x4) ====================
+# ------------------------------ Solvencia (4x4) ------------------------------
 def calcular_inversiones_y_R(estado: Tuple[int, ...]) -> Tuple[int, int]:
     plano = [x for x in estado if x != 0]
     inversiones = sum(1 for i in range(len(plano)) for j in range(i+1, len(plano)) if plano[i] > plano[j])
@@ -93,7 +92,7 @@ def explicar_paridad(estado: Tuple[int, ...]) -> None:
     print(f"Fila del 0 desde abajo (R) = {R}")
     print(f"(I + R) = {I + R}  →  {'IMPAR (RESOLUBLE)' if (I+R)%2==1 else 'PAR (NO RESOLUBLE)'}")
 
-# ==================== Reconstrucción de camino ====================
+# ------------------------------ Reconstrucción de camino ------------------------------
 def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]],
                     estado_meta: Tuple[int, ...]) -> List[str]:
     camino: List[str] = []
@@ -105,41 +104,43 @@ def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[in
     camino.reverse()
     return camino
 
-# ==================== BFS (Búsqueda en anchura) ====================
+# ------------------------------ BFS (Búsqueda en anchura) ------------------------------
 def bfs(estado_inicial: Tuple[int, ...],
         limite_expansiones: int = LIMITE_EXPANSIONES_BFS) -> Optional[List[str]]:
-    """
-    BFS clásico: óptimo en número de movimientos (coste uniforme).
-    Usa cola FIFO y 'visitados' para no repetir estados.
-    Si supera 'limite_expansiones', devuelve None.
-    """
+    # BFS clásico: óptimo en número de movimientos (coste uniforme).
+    # Usa cola FIFO y 'visitados' para no repetir estados.
+    # Si supera 'limite_expansiones', devuelve None.
     if estado_inicial == ESTADO_OBJETIVO:
+        # Si ya está resuelto, retorna lista vacía
         return []
 
-    visitados: Set[Tuple[int, ...]] = {estado_inicial}
-    cola: deque = deque([estado_inicial])
+    visitados: Set[Tuple[int, ...]] = {estado_inicial}  # Conjunto de estados ya visitados
+    cola: deque = deque([estado_inicial])  # Cola FIFO para estados a expandir
     predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]] = {estado_inicial: (None, None)}
 
-    expandidos = 0
+    expandidos = 0  # Contador de nodos expandidos
     while cola:
-        estado = cola.popleft()
+        estado = cola.popleft()  # Saca el siguiente estado de la cola
         expandidos += 1
         if expandidos >= limite_expansiones:
+            # Si se supera el límite de expansiones, termina sin solución
             return None
 
-        for movimiento in LISTA_MOVIMIENTOS:  # orden determinista
+        for movimiento in LISTA_MOVIMIENTOS:  # Intenta todos los movimientos posibles
             sucesor = aplicar_movimiento(estado, movimiento)
             if sucesor is None or sucesor in visitados:
+                # Si el movimiento no es válido o ya se visitó, lo ignora
                 continue
-            visitados.add(sucesor)
-            predecesor[sucesor] = (estado, movimiento)
+            visitados.add(sucesor)  # Marca el estado como visitado
+            predecesor[sucesor] = (estado, movimiento)  # Guarda el predecesor y el movimiento
             if sucesor == ESTADO_OBJETIVO:
+                # Si se alcanza el objetivo, reconstruye y retorna el camino
                 return reconstruir_camino(predecesor, sucesor)
-            cola.append(sucesor)
+            cola.append(sucesor)  # Agrega el sucesor a la cola para expandirlo después
 
-    return None  # no debería ocurrir en 15-puzzle, pero por completitud
+    return None  # No se encontró solución (no debería ocurrir en 15-puzzle, pero por completitud)
 
-# ==================== Parser estricto e input interactivo ====================
+# ------------------------------ Parser estricto e input interactivo ------------------------------
 def parsear_tablero_estricto(texto: str) -> Optional[Tuple[int, ...]]:
     # Acepta espacios y/o comas como separadores
     tokens = texto.replace(",", " ").split()
@@ -218,7 +219,7 @@ def reproducir_movimientos(estado_inicial: Tuple[int, ...],
         time.sleep(pausa_segundos)
     print("\nEstado completo finalizado.")
 
-# ==================== Main ====================
+
 if __name__ == "__main__":
     print("           15-puzzle — BFS (Búsqueda en anchura)          \n")
     tablero = pedir_tablero_interactivo()
