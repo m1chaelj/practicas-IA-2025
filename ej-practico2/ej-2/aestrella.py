@@ -1,26 +1,25 @@
-import random
+# resolver_15puzzle_astar.py
 import heapq
 import time
 from typing import Optional, Tuple, List, Dict, Set
 
+# ==================== Configuración base ====================
 TAMANO_TABLERO: int = 4
 ESTADO_OBJETIVO: Tuple[int, ...] = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS: Tuple[str, ...] = ('arriba', 'abajo', 'izquierda', 'derecha')
 DESPLAZAMIENTOS: Dict[str, int] = {'arriba': -TAMANO_TABLERO, 'abajo': TAMANO_TABLERO, 'izquierda': -1, 'derecha': 1}
-POSICION_OBJETIVO: Dict[int, Tuple[int, int]] = {valor: (i // TAMANO_TABLERO, i % TAMANO_TABLERO) for i, valor in enumerate(ESTADO_OBJETIVO)}
+POSICION_OBJETIVO: Dict[int, Tuple[int, int]] = {v: (i // TAMANO_TABLERO, i % TAMANO_TABLERO)
+                                                for i, v in enumerate(ESTADO_OBJETIVO)}
 
-"""
-Este solver usa A* con heurística ADMISIBLE:
-- h(n) = Distancia Manhattan + Conflicto Lineal (MC).
-- Admisible: no sobreestima el costo real óptimo c*(n); garantiza solución óptima.
-- Consistente: entre vecinos, h no cambia más de 1 (coste de arista = 1); evita reabrir nodos.
+# Visualización paso a paso
+LIMPIAR_PANTALLA: bool = False
+PAUSA_SEGUNDOS: float = 0.35
+MOSTRAR_METRICAS: bool = True
 
-Acerca de numero_mezclas:
-- numero_mezclas = número de movimientos aleatorios aplicados DESDE el objetivo para mezclar.
-- Controla la dificultad promedio: valores altos => típicamente más difícil.
-- Importante: por ciclos, la distancia óptima real de regreso NO tiene por qué ser exactamente numero_mezclas.
-"""
+# Límite operativo para A*
+LIMITE_EXPANSIONES: int = 1_000_000
 
+# ==================== Utilidades de tablero ====================
 def indice_a_fila_columna(indice: int) -> Tuple[int, int]:
     return divmod(indice, TAMANO_TABLERO)
 
@@ -40,15 +39,15 @@ def aplicar_movimiento(estado: Tuple[int, ...], movimiento: str) -> Optional[Tup
     if not movimiento_valido(indice_cero, movimiento):
         return None
     delta = DESPLAZAMIENTOS[movimiento]
-    # Evitar "wrap" lateral (no cruzar de fila con izquierda/derecha)
+    # Evitar "wrap" lateral en izquierda/derecha (no cruzar de fila)
     if movimiento in ('izquierda', 'derecha'):
         fila0, _ = indice_a_fila_columna(indice_cero)
         fila1, _ = indice_a_fila_columna(indice_cero + delta)
         if fila0 != fila1:
             return None
     lista = list(estado)
-    indice_intercambio = indice_cero + delta
-    lista[indice_cero], lista[indice_intercambio] = lista[indice_intercambio], lista[indice_cero]
+    j = indice_cero + delta
+    lista[indice_cero], lista[j] = lista[j], lista[indice_cero]
     return tuple(lista)
 
 def imprimir_tablero(estado: Tuple[int, ...]) -> None:
@@ -56,159 +55,91 @@ def imprimir_tablero(estado: Tuple[int, ...]) -> None:
         segmento = estado[fila * TAMANO_TABLERO:(fila + 1) * TAMANO_TABLERO]
         print(' '.join(f'{x:2d}' if x != 0 else '  .' for x in segmento))
 
-# Animación en consola 
 def imprimir_tablero_resaltado(estado: Tuple[int, ...], indice_resaltado: Optional[int] = None) -> None:
-    """Imprime el tablero y resalta (con corchetes) la casilla en indice_resaltado."""
     for fila in range(TAMANO_TABLERO):
         celdas = []
         for columna in range(TAMANO_TABLERO):
             idx = fila_columna_a_indice(fila, columna)
-            valor = estado[idx]
-            celda = f'{valor:2d}' if valor != 0 else '  .'
+            val = estado[idx]
+            celda = f'{val:2d}' if val != 0 else '  .'
             if indice_resaltado is not None and idx == indice_resaltado:
                 celda = f'[{celda}]'
             celdas.append(celda)
         print(' '.join(celdas))
 
 def limpiar_consola() -> None:
-    """Limpia la consola en Windows/Unix."""
     import os, sys
-    if sys.platform.startswith('win'):
-        os.system('cls')
-    else:
-        os.system('clear')
+    os.system('cls' if sys.platform.startswith('win') else 'clear')
 
-def reproducir_movimientos(
-    estado_inicial: Tuple[int, ...],
-    lista_movimientos: List[str],
-    pausa_segundos: float = 0.35,
-    limpiar_pantalla: bool = False,
-    mostrar_metricas: bool = True
-) -> None:
-    """
-    Reproduce la solución movimiento a movimiento.
-    - Resalta la ficha que se acaba de mover (la que intercambió con el 0).
-    - Si limpiar_pantalla=True, va “animando” en la consola.
-    - Si mostrar_metricas=True, muestra g, h y f en cada paso.
-    """
-    estado = estado_inicial
-    print("\nEstado inicial:")
-    imprimir_tablero(estado)
-    if mostrar_metricas:
-        h0 = heuristica_mc(estado)
-        print(f"g=0  h={h0}  f={0 + h0}")
+# ==================== Solvencia (4x4) ====================
+def calcular_inversiones_y_R(estado: Tuple[int, ...]) -> Tuple[int, int]:
+    plano = [x for x in estado if x != 0]
+    inversiones = sum(1 for i in range(len(plano)) for j in range(i+1, len(plano)) if plano[i] > plano[j])
+    idx0 = estado.index(0)
+    fila_desde_arriba = idx0 // TAMANO_TABLERO
+    R = TAMANO_TABLERO - fila_desde_arriba  # 1..4
+    return inversiones, R
 
-    for paso, movimiento in enumerate(lista_movimientos, start=1):
-        indice_cero_antes = estado.index(0)
-        estado_nuevo = aplicar_movimiento(estado, movimiento)
-        if estado_nuevo is None:
-            raise RuntimeError(f"Movimiento inválido durante reproducción: {movimiento}")
-
-        # La ficha movida queda en la posición donde estaba el 0
-        indice_ficha_movida_en_nuevo = indice_cero_antes
-
-        g = paso
-        h = heuristica_mc(estado_nuevo) if mostrar_metricas else 0
-        f = g + h
-
-        if limpiar_pantalla:
-            limpiar_consola()
-
-        print(f"\nPaso {paso}: mover {movimiento}")
-        imprimir_tablero_resaltado(estado_nuevo, indice_resaltado=indice_ficha_movida_en_nuevo)
-        if mostrar_metricas:
-            print(f"g={g}  h={h}  f={f}")
-
-        time.sleep(pausa_segundos)
-        estado = estado_nuevo
-
-    print("\nEstado completo finalizado.")
-
-# Solvencia 
 def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
-    # Validación de contenido {0..15} sin duplicados
-    if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO * TAMANO_TABLERO)):
+    if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO*TAMANO_TABLERO)):
         return False
-    lista_sin_cero: List[int] = [x for x in estado if x != 0]
-    numero_inversiones = 0
-    for i in range(len(lista_sin_cero)):
-        for j in range(i + 1, len(lista_sin_cero)):
-            if lista_sin_cero[i] > lista_sin_cero[j]:
-                numero_inversiones += 1
-    indice_cero = estado.index(0)
-    fila_desde_arriba = indice_cero // TAMANO_TABLERO
-    fila_hueco_desde_abajo = TAMANO_TABLERO - fila_desde_arriba  # 1..T
-    # Regla 4x4: resoluble ssi (inversiones + fila_hueco_desde_abajo) es impar
-    return (numero_inversiones + fila_hueco_desde_abajo) % 2 == 1
+    I, R = calcular_inversiones_y_R(estado)
+    return (I + R) % 2 == 1
 
-# Heurística: Manhattan + Conflicto Lineal
+def explicar_paridad(estado: Tuple[int, ...]) -> None:
+    I, R = calcular_inversiones_y_R(estado)
+    plano = [x for x in estado if x != 0]
+    print("\n[Chequeo de solvencia 4x4]")
+    print("Secuencia (sin 0):", plano)
+    print(f"Inversiones (I) = {I}")
+    print(f"Fila del 0 desde abajo (R) = {R}")
+    print(f"(I + R) = {I + R}  →  {'IMPAR (RESOLUBLE)' if (I+R)%2==1 else 'PAR (NO RESOLUBLE)'}")
+
+# ==================== Heurística: Manhattan + Conflicto Lineal ====================
 def distancia_manhattan(estado: Tuple[int, ...]) -> int:
-    distancia_total = 0
-    for indice, valor in enumerate(estado):
-        if valor == 0:
-            continue
-        fila_act, col_act = indice_a_fila_columna(indice)
-        fila_obj, col_obj = POSICION_OBJETIVO[valor]
-        distancia_total += abs(fila_act - fila_obj) + abs(col_act - col_obj)
-    return distancia_total
+    total = 0
+    for i, v in enumerate(estado):
+        if v == 0: continue
+        f, c = indice_a_fila_columna(i)
+        fo, co = POSICION_OBJETIVO[v]
+        total += abs(f-fo) + abs(c-co)
+    return total
 
 def conflicto_lineal(estado: Tuple[int, ...]) -> int:
-    conflictos = 0
+    conf = 0
     # Filas
-    for fila in range(TAMANO_TABLERO):
-        columnas_objetivo_en_fila: List[int] = []
-        for columna in range(TAMANO_TABLERO):
-            valor = estado[fila_columna_a_indice(fila, columna)]
-            if valor != 0 and POSICION_OBJETIVO[valor][0] == fila:
-                columnas_objetivo_en_fila.append(POSICION_OBJETIVO[valor][1])
-        # contar pares invertidos (inversiones) en columnas_objetivo_en_fila
-        for i in range(len(columnas_objetivo_en_fila)):
-            for j in range(i + 1, len(columnas_objetivo_en_fila)):
-                if columnas_objetivo_en_fila[i] > columnas_objetivo_en_fila[j]:
-                    conflictos += 1
+    for f in range(TAMANO_TABLERO):
+        cols_obj = []
+        for c in range(TAMANO_TABLERO):
+            v = estado[f*TAMANO_TABLERO + c]
+            if v != 0 and POSICION_OBJETIVO[v][0] == f:
+                cols_obj.append(POSICION_OBJETIVO[v][1])
+        for i in range(len(cols_obj)):
+            for j in range(i+1, len(cols_obj)):
+                if cols_obj[i] > cols_obj[j]: conf += 1
     # Columnas
-    for columna in range(TAMANO_TABLERO):
-        filas_objetivo_en_columna: List[int] = []
-        for fila in range(TAMANO_TABLERO):
-            valor = estado[fila_columna_a_indice(fila, columna)]
-            if valor != 0 and POSICION_OBJETIVO[valor][1] == columna:
-                filas_objetivo_en_columna.append(POSICION_OBJETIVO[valor][0])
-        for i in range(len(filas_objetivo_en_columna)):
-            for j in range(i + 1, len(filas_objetivo_en_columna)):
-                if filas_objetivo_en_columna[i] > filas_objetivo_en_columna[j]:
-                    conflictos += 1
-    return 2 * conflictos
+    for c in range(TAMANO_TABLERO):
+        filas_obj = []
+        for f in range(TAMANO_TABLERO):
+            v = estado[f*TAMANO_TABLERO + c]
+            if v != 0 and POSICION_OBJETIVO[v][1] == c:
+                filas_obj.append(POSICION_OBJETIVO[v][0])
+        for i in range(len(filas_obj)):
+            for j in range(i+1, len(filas_obj)):
+                if filas_obj[i] > filas_obj[j]: conf += 1
+    return 2*conf
 
 def heuristica_mc(estado: Tuple[int, ...]) -> int:
-    # Heurística MC (admisible y consistente)
     return distancia_manhattan(estado) + conflicto_lineal(estado)
 
-# Generar instancia a N movimientos del objetivo 
-def mezclar_desde_objetivo(numero_mezclas: int, semilla: Optional[int] = None) -> Tuple[int, ...]:
-    if semilla is not None:
-        random.seed(semilla)
-    estado: Tuple[int, ...] = ESTADO_OBJETIVO
-    ultimo_movimiento: Optional[str] = None
-    movimiento_inverso: Dict[str, str] = {'arriba': 'abajo', 'abajo': 'arriba', 'izquierda': 'derecha', 'derecha': 'izquierda'}
-    for _ in range(numero_mezclas):
-        indice_cero = estado.index(0)
-        movimientos_posibles: List[str] = [m for m in LISTA_MOVIMIENTOS if movimiento_valido(indice_cero, m)]
-        if ultimo_movimiento and movimiento_inverso[ultimo_movimiento] in movimientos_posibles:
-            movimientos_posibles.remove(movimiento_inverso[ultimo_movimiento])  # evita deshacer inmediato
-        movimiento_elegido = random.choice(movimientos_posibles)
-        estado = aplicar_movimiento(estado, movimiento_elegido)  # type: ignore[assignment]
-        ultimo_movimiento = movimiento_elegido
-    # Solvencia garantizada por construcción
-    return estado
-
-# A* con progreso, MC fija y límite 
+# ==================== A* (h = Manhattan + Conflicto Lineal) ====================
 def a_estrella(
     estado_inicial: Tuple[int, ...],
     imprimir_progreso: bool = True,
     frecuencia_progreso: int = 10000,
-    limite_expansiones: int = 1_000_000
+    limite_expansiones: int = LIMITE_EXPANSIONES
 ) -> Tuple[Optional[List[str]], int]:
-    h = heuristica_mc  # Usamos SIEMPRE Manhattan + Conflicto Lineal
+    h = heuristica_mc
     if estado_inicial == ESTADO_OBJETIVO:
         return [], 0
 
@@ -219,108 +150,172 @@ def a_estrella(
     contador_orden = 0
     expandidos = 0
 
-    f_inicial = h(estado_inicial)  # g=0
-    heapq.heappush(abiertos_heap, (f_inicial, h(estado_inicial), contador_orden, estado_inicial))
+    f0 = h(estado_inicial)
+    heapq.heappush(abiertos_heap, (f0, f0, contador_orden, estado_inicial))
 
-    instante_inicio = time.time()
     while abiertos_heap:
-        f_actual, h_del_estado_actual, _, estado_actual = heapq.heappop(abiertos_heap)
-        if estado_actual in cerrados:
+        f_actual, h_actual, _, estado = heapq.heappop(abiertos_heap)
+        if estado in cerrados:
             continue
 
-        if estado_actual == ESTADO_OBJETIVO:
-            # reconstruir camino
+        if estado == ESTADO_OBJETIVO:
             camino: List[str] = []
-            cursor: Tuple[int, ...] = estado_actual
-            while predecesor[cursor][0] is not None:
-                anterior, movimiento = predecesor[cursor]
-                camino.append(movimiento or "")
-                cursor = anterior or ESTADO_OBJETIVO
+            cur = estado
+            while predecesor[cur][0] is not None:
+                ant, mov = predecesor[cur]
+                camino.append(mov or "")
+                cur = ant or ESTADO_OBJETIVO
             camino.reverse()
-            # duracion = time.time() - instante_inicio
             return camino, expandidos
 
-        cerrados.add(estado_actual)
+        cerrados.add(estado)
         expandidos += 1
         if imprimir_progreso and expandidos % frecuencia_progreso == 0:
-            print(f"[A*] Expandidos: {expandidos:,}  f={f_actual}  h={h_del_estado_actual}  g={costo_desde_inicio[estado_actual]}")
+            print(f"[A*] Expandidos: {expandidos:,}  f={f_actual}  h={h_actual}  g={costo_desde_inicio[estado]}")
 
         if expandidos >= limite_expansiones:
             return None, expandidos
 
-        g_estado_actual = costo_desde_inicio[estado_actual]
-        for movimiento in LISTA_MOVIMIENTOS:  # orden determinista
-            vecino = aplicar_movimiento(estado_actual, movimiento)
+        g_s = costo_desde_inicio[estado]
+        for mov in LISTA_MOVIMIENTOS:  # orden determinista
+            vecino = aplicar_movimiento(estado, mov)
             if vecino is None:
                 continue
-            costo_g_tentativo = g_estado_actual + 1
-
-            # Si ya se cerró con un g mejor o igual, ignoro
-            if vecino in cerrados and costo_g_tentativo >= costo_desde_inicio.get(vecino, float('inf')):
+            tent = g_s + 1
+            if vecino in cerrados and tent >= costo_desde_inicio.get(vecino, float('inf')):
                 continue
-
-            # Si mejora el mejor g conocido, actualizo y REINSERTO en heap SIEMPRE (permitir duplicados)
-            if costo_g_tentativo < costo_desde_inicio.get(vecino, float('inf')):
-                costo_desde_inicio[vecino] = costo_g_tentativo
-                predecesor[vecino] = (estado_actual, movimiento)
-                h_vecino = h(vecino)
-                f_vecino = costo_g_tentativo + h_vecino
+            if tent < costo_desde_inicio.get(vecino, float('inf')):
+                costo_desde_inicio[vecino] = tent
+                predecesor[vecino] = (estado, mov)
+                hv = h(vecino)
+                fv = tent + hv
                 contador_orden += 1
-                heapq.heappush(abiertos_heap, (f_vecino, h_vecino, contador_orden, vecino))
-            # Si no mejora, no hago nada
-
+                heapq.heappush(abiertos_heap, (fv, hv, contador_orden, vecino))
     return None, expandidos
 
+# ==================== Parser estricto e input interactivo ====================
+def parsear_tablero_estricto(texto: str) -> Optional[Tuple[int, ...]]:
+    # Acepta espacios y/o comas como separadores
+    tokens = texto.replace(",", " ").split()
+    # ¿Exactamente 16 tokens?
+    if len(tokens) != TAMANO_TABLERO * TAMANO_TABLERO:
+        print(f"\nEntrada inválida: se leyeron {len(tokens)} valores, se requieren {TAMANO_TABLERO*TAMANO_TABLERO}.")
+        return None
+    # ¿Todos numéricos?
+    valores: List[int] = []
+    for t in tokens:
+        try:
+            valores.append(int(t))
+        except ValueError:
+            print(f"\nEntrada inválida: '{t}' no es un número entero.")
+            return None
+    # Rango permitido
+    fuera_de_rango = [x for x in valores if not (0 <= x <= 15)]
+    if fuera_de_rango:
+        print("Valores fuera de rango [0..15]:", sorted(fuera_de_rango))
+        return None
+    # Duplicados y faltantes
+    esperados = set(range(16))
+    s = set(valores)
+    duplicados = sorted([x for x in s if valores.count(x) > 1])
+    faltantes = sorted(list(esperados - s))
+    if duplicados or faltantes:
+        if duplicados:
+            print("Duplicados:", duplicados)
+        if faltantes:
+            print("Faltan:", faltantes)
+        return None
+    return tuple(valores)
 
+def pedir_tablero_interactivo() -> Optional[Tuple[int, ...]]:
+    """
+    Pide un tablero al usuario. Permite pegar en varias líneas; línea vacía finaliza la captura.
+    Si la entrada es inválida, explica el error y vuelve a pedir.
+    Devuelve None si el usuario envía inmediatamente una línea vacía (cancelar).
+    """
+    print("Pega 16 números (0..15), 0 es el hueco. Puedes usar espacios o comas. ")
+    print("Ejemplo: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0")
+    print("Deja una línea vacía para validar. Línea vacía inmediata = cancelar.\n")
+    while True:
+        lineas: List[str] = []
+        while True:
+            linea = input()
+            if not linea.strip():
+                break
+            lineas.append(linea)
+        if not lineas:
+            # canceló
+            return None
+        tablero = parsear_tablero_estricto("\n".join(lineas))
+        if tablero is not None:
+            return tablero
+        print("\nEntrada inválida. Intenta de nuevo (o presiona Enter inmediatamente para cancelar).\n")
+
+# ==================== Reproducción paso a paso ====================
+def reproducir_movimientos(
+    estado_inicial: Tuple[int, ...],
+    lista_movimientos: List[str],
+    pausa_segundos: float = PAUSA_SEGUNDOS,
+    limpiar_pantalla: bool = LIMPIAR_PANTALLA,
+    mostrar_metricas: bool = MOSTRAR_METRICAS
+) -> None:
+    estado = estado_inicial
+    print("\nEstado inicial:")
+    imprimir_tablero(estado)
+    if mostrar_metricas:
+        h0 = heuristica_mc(estado)
+        print(f"g=0  h={h0}  f={0 + h0}")
+
+    for paso, movimiento in enumerate(lista_movimientos, start=1):
+        idx0_antes = estado.index(0)
+        nuevo = aplicar_movimiento(estado, movimiento)
+        if nuevo is None:
+            raise RuntimeError(f"Movimiento inválido durante reproducción: {movimiento}")
+        estado = nuevo
+        if limpiar_pantalla:
+            limpiar_consola()
+        print(f"\nPaso {paso}: mover {movimiento}")
+        imprimir_tablero_resaltado(estado, indice_resaltado=idx0_antes)  # resalta la ficha movida
+        if mostrar_metricas:
+            h = heuristica_mc(estado)
+            print(f"g={paso}  h={h}  f={paso + h}")
+        time.sleep(pausa_segundos)
+    print("\nEstado completo finalizado.")
+
+# ==================== Main ====================
 if __name__ == "__main__":
-    print("Generando tablero a N movimientos del objetivo (numero_mezclas).")
-    try:
-        numero_mezclas = int(input("\nElige numero_mezclas (0–200; p.ej. 25 fácil, 40 medio, 50+ difícil): ").strip() or "25")
-    except ValueError:
-        numero_mezclas = 25
-    numero_mezclas = max(0, min(200, numero_mezclas))  # limitar a rango razonable
+    print("           15-puzzle — A* (Manhattan + Conflicto Lineal)          \n")
+    tablero = pedir_tablero_interactivo()
+    if tablero is None:
+        print("No se ingresó ningún tablero. Saliendo.")
+        raise SystemExit(0)
 
-    entrada_semilla = input("\nSemilla (opcional, enter para ninguna): ").strip()
-    semilla = int(entrada_semilla) if entrada_semilla.isdigit() else None
+    print("\nTablero inicial (manual):")
+    imprimir_tablero(tablero)
 
-    estado_inicial = mezclar_desde_objetivo(numero_mezclas, semilla=semilla)
+    # Mostrar solvencia y decidir
+    explicar_paridad(tablero)
+    if not es_resoluble_4x4(tablero):
+        print("\nSolvencia: NO RESOLUBLE. No se ejecuta A*.")
+        raise SystemExit(0)
+    else:
+        print("\nSolvencia: RESOLUBLE. Procediendo con A*.")
 
-    print("\nTablero inicial:")
-    imprimir_tablero(estado_inicial)
+    # Info inicial de heurística (cota inferior)
+    h_ini = heuristica_mc(tablero)
+    print(f"\nh_MC(inicio) = {h_ini}  (cota inferior de pasos restantes)")
 
-    print("\nEstado objetivo (tablero ordenado):")
-    imprimir_tablero(ESTADO_OBJETIVO)
-    print(f"\nh_MC(objetivo) = {heuristica_mc(ESTADO_OBJETIVO)}  (debe ser 0)")
-
-    # Solvencia (siempre True al mezclar desde objetivo, pero lo mostramos)
-    print("\nSolvencia (4x4):", "RESOLUBLE" if es_resoluble_4x4(estado_inicial) else "NO RESOLUBLE")
-
-    # Mostrar heurística estimada al inicio (cota inferior del costo real)
-    h_inicial = heuristica_mc(estado_inicial)
-    print(f"h_MC(inicio) = {h_inicial}  (estimación mínima de pasos restantes)")
-
-    solucion, nodos_expandidos = a_estrella(
-        estado_inicial,
+    # Resolver con A*
+    solucion, expandidos = a_estrella(
+        tablero,
         imprimir_progreso=True,
         frecuencia_progreso=10000,
-        limite_expansiones=1_000_000
+        limite_expansiones=LIMITE_EXPANSIONES
     )
 
     if solucion is None:
-        print(f"\nNo se encontró solución dentro del límite. Nodos expandidos: {nodos_expandidos:,}")
+        print(f"\nNo se encontró solución dentro del límite. Nodos expandidos: {expandidos:,}")
     else:
-        print(f"\nSolución en {len(solucion)} movimientos. \n Nodos expandidos: {nodos_expandidos:,}")
-        print("\nSecuencia:", solucion)
-
-        # ===== Reproducción paso a paso =====
-        LIMPIAR_PANTALLA = False   # True para “animación” que limpia la consola en cada paso
-        PAUSA_SEGUNDOS = 0.35      # tiempo entre pasos
-        MOSTRAR_METRICAS = True    # muestra g/h/f en cada estado
-
-        reproducir_movimientos(
-            estado_inicial=estado_inicial,
-            lista_movimientos=solucion,
-            pausa_segundos=PAUSA_SEGUNDOS,
-            limpiar_pantalla=LIMPIAR_PANTALLA,
-            mostrar_metricas=MOSTRAR_METRICAS
-        )
+        print(f"\nSolución en {len(solucion)} movimientos. \nNodos expandidos: {expandidos:,}")
+        print("Secuencia:", solucion)
+        reproducir_movimientos(tablero, solucion)

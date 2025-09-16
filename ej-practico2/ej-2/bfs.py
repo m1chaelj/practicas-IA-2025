@@ -1,18 +1,22 @@
-import random
+# resolver_15puzzle_bfs.py
 import time
 from collections import deque
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, Set
 
+# ==================== Configuración base ====================
 TAMANO_TABLERO: int = 4
 ESTADO_OBJETIVO: Tuple[int, ...] = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS: Tuple[str, ...] = ('arriba', 'abajo', 'izquierda', 'derecha')  # orden determinista
-DESPLAZAMIENTOS: Dict[str, int] = {
-    'arriba': -TAMANO_TABLERO,
-    'abajo': TAMANO_TABLERO,
-    'izquierda': -1,
-    'derecha': 1,
-}
+DESPLAZAMIENTOS: Dict[str, int] = {'arriba': -TAMANO_TABLERO, 'abajo': TAMANO_TABLERO, 'izquierda': -1, 'derecha': 1}
 
+# Visualización paso a paso
+LIMPIAR_PANTALLA: bool = False  # True para limpiar consola en cada paso
+PAUSA_SEGUNDOS: float = 0.25    # pausa entre pasos al reproducir
+
+# Seguridad para BFS (evitar cuelgues): puedes subir/bajar este número
+LIMITE_EXPANSIONES_BFS: int = 1_000_000
+
+# ==================== Utilidades de tablero ====================
 def indice_a_fila_columna(indice: int) -> Tuple[int, int]:
     return divmod(indice, TAMANO_TABLERO)
 
@@ -32,20 +36,16 @@ def aplicar_movimiento(estado: Tuple[int, ...], movimiento: str) -> Optional[Tup
     if not movimiento_valido(indice_cero, movimiento):
         return None
     delta = DESPLAZAMIENTOS[movimiento]
-    # Evitar cruzar de fila con izquierda/derecha
+    # Evitar “wrap” lateral (no cruzar de fila) en izquierda/derecha
     if movimiento in ('izquierda', 'derecha'):
         fila0, _ = indice_a_fila_columna(indice_cero)
         fila1, _ = indice_a_fila_columna(indice_cero + delta)
         if fila0 != fila1:
             return None
     lista = list(estado)
-    indice_intercambio = indice_cero + delta
-    lista[indice_cero], lista[indice_intercambio] = lista[indice_intercambio], lista[indice_cero]
+    j = indice_cero + delta
+    lista[indice_cero], lista[j] = lista[j], lista[indice_cero]
     return tuple(lista)
-
-def invertir_movimiento(movimiento: str) -> str:
-    inverso = {'arriba': 'abajo', 'abajo': 'arriba', 'izquierda': 'derecha', 'derecha': 'izquierda'}
-    return inverso[movimiento]
 
 def imprimir_tablero(estado: Tuple[int, ...]) -> None:
     for fila in range(TAMANO_TABLERO):
@@ -53,58 +53,47 @@ def imprimir_tablero(estado: Tuple[int, ...]) -> None:
         print(' '.join(f'{x:2d}' if x != 0 else '  .' for x in segmento))
 
 def imprimir_tablero_resaltado(estado: Tuple[int, ...], indice_resaltado: Optional[int] = None) -> None:
-    """Imprime el tablero y resalta (con corchetes) la casilla en indice_resaltado (donde estaba el 0 antes)."""
+    """Imprime el tablero y resalta (con corchetes) la casilla donde estaba el 0 antes (la ficha que se movió)."""
     for fila in range(TAMANO_TABLERO):
         celdas = []
         for columna in range(TAMANO_TABLERO):
             idx = fila_columna_a_indice(fila, columna)
-            valor = estado[idx]
-            celda = f'{valor:2d}' if valor != 0 else '  .'
+            val = estado[idx]
+            celda = f'{val:2d}' if val != 0 else '  .'
             if indice_resaltado is not None and idx == indice_resaltado:
                 celda = f'[{celda}]'
             celdas.append(celda)
         print(' '.join(celdas))
 
-# Solvencia
-def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
-    # Validación de contenido {0..15} sin duplicados
-    if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO * TAMANO_TABLERO)):
-        return False
+def limpiar_consola() -> None:
+    import os, sys
+    os.system('cls' if sys.platform.startswith('win') else 'clear')
+
+# ==================== Solvencia (4x4) ====================
+def calcular_inversiones_y_R(estado: Tuple[int, ...]) -> Tuple[int, int]:
     plano = [x for x in estado if x != 0]
-    numero_inversiones = sum(1 for i in range(len(plano)) for j in range(i + 1, len(plano)) if plano[i] > plano[j])
-    indice_cero = estado.index(0)
-    fila_cero_desde_arriba = indice_cero // TAMANO_TABLERO
-    fila_cero_desde_abajo = TAMANO_TABLERO - fila_cero_desde_arriba  # 1..4
-    return (numero_inversiones + fila_cero_desde_abajo) % 2 == 1
+    inversiones = sum(1 for i in range(len(plano)) for j in range(i+1, len(plano)) if plano[i] > plano[j])
+    idx0 = estado.index(0)
+    fila_desde_arriba = idx0 // TAMANO_TABLERO
+    R = TAMANO_TABLERO - fila_desde_arriba  # 1..4
+    return inversiones, R
 
-# Generadores de instancias
-def tablero_resoluble_aleatorio() -> Tuple[int, ...]:
-    """Baraja al azar hasta obtener un estado resoluble (sin k)."""
-    numeros = list(range(TAMANO_TABLERO * TAMANO_TABLERO))
-    while True:
-        random.shuffle(numeros)
-        estado = tuple(numeros)
-        if es_resoluble_4x4(estado):
-            return estado
+def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
+    if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO*TAMANO_TABLERO)):
+        return False
+    I, R = calcular_inversiones_y_R(estado)
+    return (I + R) % 2 == 1
 
-def mezclar_desde_objetivo(numero_mezclas: int, semilla: Optional[int] = None) -> Tuple[int, ...]:
-    """Aplica 'numero_mezclas' movimientos aleatorios DESDE el objetivo (solvencia garantizada)."""
-    if semilla is not None:
-        random.seed(semilla)
-    estado = ESTADO_OBJETIVO
-    ultimo = None
-    inverso = {'arriba': 'abajo', 'abajo': 'arriba', 'izquierda': 'derecha', 'derecha': 'izquierda'}
-    for _ in range(max(0, numero_mezclas)):
-        indice_cero = estado.index(0)
-        posibles = [m for m in LISTA_MOVIMIENTOS if movimiento_valido(indice_cero, m)]
-        if ultimo and inverso[ultimo] in posibles:
-            posibles.remove(inverso[ultimo])  # evitar deshacer inmediato
-        m = random.choice(posibles)
-        estado = aplicar_movimiento(estado, m) or estado
-        ultimo = m
-    return estado
+def explicar_paridad(estado: Tuple[int, ...]) -> None:
+    I, R = calcular_inversiones_y_R(estado)
+    plano = [x for x in estado if x != 0]
+    print("\n[Chequeo de solvencia 4x4]")
+    print("Secuencia (sin 0):", plano)
+    print(f"Inversiones (I) = {I}")
+    print(f"Fila del 0 desde abajo (R) = {R}")
+    print(f"(I + R) = {I + R}  →  {'IMPAR (RESOLUBLE)' if (I+R)%2==1 else 'PAR (NO RESOLUBLE)'}")
 
-# Reconstrucción de camino 
+# ==================== Reconstrucción de camino ====================
 def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]],
                     estado_meta: Tuple[int, ...]) -> List[str]:
     camino: List[str] = []
@@ -116,162 +105,145 @@ def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[in
     camino.reverse()
     return camino
 
-# Búsqueda Bidireccional (con límites operativos)
-def busqueda_bidireccional(
-    estado_inicial: Tuple[int, ...],
-    timeout_segundos: Optional[float],
-    limite_expansiones: int
-) -> Optional[List[str]]:
+# ==================== BFS (Búsqueda en anchura) ====================
+def bfs(estado_inicial: Tuple[int, ...],
+        limite_expansiones: int = LIMITE_EXPANSIONES_BFS) -> Optional[List[str]]:
     """
-    BFS desde el inicio y desde el objetivo a la vez.
-    * Óptimo en # de movimientos.
-    * Respeta timeout y límite de expansiones (sin imprimir métricas).
+    BFS clásico: óptimo en número de movimientos (coste uniforme).
+    Usa cola FIFO y 'visitados' para no repetir estados.
+    Si supera 'limite_expansiones', devuelve None.
     """
     if estado_inicial == ESTADO_OBJETIVO:
         return []
 
-    instante_inicio = time.time()
-    expandidos_total = 0  # sumado entre ambos frentes
+    visitados: Set[Tuple[int, ...]] = {estado_inicial}
+    cola: deque = deque([estado_inicial])
+    predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]] = {estado_inicial: (None, None)}
 
-    cola_izq: deque = deque([estado_inicial])   # desde inicio
-    cola_der: deque = deque([ESTADO_OBJETIVO])  # desde objetivo
-
-    visitado_izq: Dict[Tuple[int, ...], int] = {estado_inicial: 0}
-    visitado_der: Dict[Tuple[int, ...], int] = {ESTADO_OBJETIVO: 0}
-
-    prede_izq: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]] = {estado_inicial: (None, None)}
-    prede_der: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]] = {ESTADO_OBJETIVO: (None, None)}
-
-    def tiempo_excedido() -> bool:
-        return timeout_segundos is not None and (time.time() - instante_inicio) >= timeout_segundos
-
-    def expandir_desde_izq() -> Optional[Tuple[int, ...]]:
-        nonlocal expandidos_total
-        if not cola_izq:
+    expandidos = 0
+    while cola:
+        estado = cola.popleft()
+        expandidos += 1
+        if expandidos >= limite_expansiones:
             return None
-        estado = cola_izq.popleft()
-        profundidad = visitado_izq[estado]
-        for movimiento in LISTA_MOVIMIENTOS:
+
+        for movimiento in LISTA_MOVIMIENTOS:  # orden determinista
             sucesor = aplicar_movimiento(estado, movimiento)
-            if sucesor is None or sucesor in visitado_izq:
+            if sucesor is None or sucesor in visitados:
                 continue
-            visitado_izq[sucesor] = profundidad + 1
-            prede_izq[sucesor] = (estado, movimiento)
-            expandidos_total += 1
-            if sucesor in visitado_der:
-                return sucesor
-            cola_izq.append(sucesor)
-            if expandidos_total >= limite_expansiones or tiempo_excedido():
-                return None
+            visitados.add(sucesor)
+            predecesor[sucesor] = (estado, movimiento)
+            if sucesor == ESTADO_OBJETIVO:
+                return reconstruir_camino(predecesor, sucesor)
+            cola.append(sucesor)
+
+    return None  # no debería ocurrir en 15-puzzle, pero por completitud
+
+# ==================== Parser estricto e input interactivo ====================
+def parsear_tablero_estricto(texto: str) -> Optional[Tuple[int, ...]]:
+    # Acepta espacios y/o comas como separadores
+    tokens = texto.replace(",", " ").split()
+    # ¿Exactamente 16 tokens?
+    if len(tokens) != TAMANO_TABLERO * TAMANO_TABLERO:
+        print(f"\nEntrada inválida: se leyeron {len(tokens)} valores, se requieren {TAMANO_TABLERO*TAMANO_TABLERO}.")
         return None
-
-    def expandir_desde_der() -> Optional[Tuple[int, ...]]:
-        nonlocal expandidos_total
-        if not cola_der:
+    # ¿Todos numéricos?
+    valores: List[int] = []
+    for t in tokens:
+        try:
+            valores.append(int(t))
+        except ValueError:
+            print(f"\nEntrada inválida: '{t}' no es un número entero.")
             return None
-        estado = cola_der.popleft()
-        profundidad = visitado_der[estado]
-        for movimiento in LISTA_MOVIMIENTOS:
-            sucesor = aplicar_movimiento(estado, movimiento)
-            if sucesor is None or sucesor in visitado_der:
-                continue
-            visitado_der[sucesor] = profundidad + 1
-            prede_der[sucesor] = (estado, movimiento)
-            expandidos_total += 1
-            if sucesor in visitado_izq:
-                return sucesor
-            cola_der.append(sucesor)
-            if expandidos_total >= limite_expansiones or tiempo_excedido():
-                return None
+    # Rango permitido
+    fuera_de_rango = [x for x in valores if not (0 <= x <= 15)]
+    if fuera_de_rango:
+        print("Valores fuera de rango [0..15]:", sorted(fuera_de_rango))
         return None
+    # Duplicados y faltantes
+    esperados = set(range(16))
+    s = set(valores)
+    duplicados = sorted([x for x in s if valores.count(x) > 1])
+    faltantes = sorted(list(esperados - s))
+    if duplicados or faltantes:
+        if duplicados:
+            print("Duplicados:", duplicados)
+        if faltantes:
+            print("Faltan:", faltantes)
+        return None
+    return tuple(valores)
 
-    while cola_izq and cola_der:
-        if tiempo_excedido() or expandidos_total >= limite_expansiones:
+def pedir_tablero_interactivo() -> Optional[Tuple[int, ...]]:
+    """
+    Pide un tablero al usuario. Permite pegar en varias líneas; línea vacía finaliza la captura.
+    Si la entrada es inválida, explica el error y vuelve a pedir.
+    Devuelve None si el usuario envía inmediatamente una línea vacía (cancelar).
+    """
+    print("Pega 16 números (0..15), 0 es el hueco. Puedes usar espacios o comas.")
+    print("Ejemplo: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0")
+    print("Deja una línea vacía para validar. Línea vacía inmediata = cancelar.\n")
+    while True:
+        lineas: List[str] = []
+        while True:
+            linea = input()
+            if not linea.strip():
+                break
+            lineas.append(linea)
+        if not lineas:
+            # canceló
             return None
-        # expandir siempre la cola más pequeña (balance)
-        expandir_izq = len(cola_izq) <= len(cola_der)
-        encuentro = expandir_desde_izq() if expandir_izq else expandir_desde_der()
-        if encuentro is not None:
-            # inicio -> encuentro
-            camino_izq = reconstruir_camino(prede_izq, encuentro)
-            # objetivo -> encuentro (desde el lado derecho)
-            camino_der_obj_a_enc = reconstruir_camino(prede_der, encuentro)
-            # encuentro -> objetivo (invertir orden y movimientos)
-            camino_enc_a_obj = [invertir_movimiento(m) for m in reversed(camino_der_obj_a_enc)]
-            return camino_izq + camino_enc_a_obj
+        tablero = parsear_tablero_estricto("\n".join(lineas))
+        if tablero is not None:
+            return tablero
+        print("\nEntrada inválida. Intenta de nuevo (o presiona Enter inmediatamente para cancelar).\n")
 
-    return None  # sin solución dentro de límites (o fronteras vacías)
-
-# Reproducción paso a paso
-def reproducir_movimientos(estado_inicial: Tuple[int, ...], lista_movimientos: List[str], pausa_segundos: float = 0.25) -> None:
+# ==================== Reproducción paso a paso ====================
+def reproducir_movimientos(estado_inicial: Tuple[int, ...],
+                        lista_movimientos: List[str],
+                        pausa_segundos: float = PAUSA_SEGUNDOS,
+                        limpiar_pantalla: bool = LIMPIAR_PANTALLA) -> None:
     estado = estado_inicial
     print("\nEstado inicial:")
     imprimir_tablero(estado)
     for paso, movimiento in enumerate(lista_movimientos, start=1):
-        indice_cero_antes = estado.index(0)
+        idx0_antes = estado.index(0)
         nuevo = aplicar_movimiento(estado, movimiento)
         if nuevo is None:
             raise RuntimeError(f"Movimiento inválido durante reproducción: {movimiento}")
         estado = nuevo
+        if limpiar_pantalla:
+            limpiar_consola()
         print(f"\nPaso {paso}: mover {movimiento}")
-        imprimir_tablero_resaltado(estado, indice_resaltado=indice_cero_antes)
+        imprimir_tablero_resaltado(estado, indice_resaltado=idx0_antes)
         time.sleep(pausa_segundos)
     print("\nEstado completo finalizado.")
 
-
+# ==================== Main ====================
 if __name__ == "__main__":
-    print("Generación del tablero inicial:")
-    print("  1) Mezclar desde objetivo con k (control de dificultad)")
-    print("  2) Aleatorio resoluble")
-    opcion = input("Elige la opcion 1 o 2, default=1]: ").strip() or "1"
+    print("           15-puzzle — BFS (Búsqueda en anchura)          \n")
+    tablero = pedir_tablero_interactivo()
+    if tablero is None:
+        print("No se ingresó ningún tablero. Saliendo.")
+        raise SystemExit(0)
 
-    if opcion == "1":
-        try:
-            k = int(input("k (0–200; 25 fácil, 40 medio, 60+ difícil) [40]: ").strip() or "40")
-        except ValueError:
-            k = 40
-        k = max(0, min(200, k))
-        sem = input("Semilla (opcional, Enter para ninguna): ").strip()
-        semilla = int(sem) if sem.isdigit() else None
-        estado_inicial = mezclar_desde_objetivo(k, semilla=semilla)
+    print("\nTablero inicial (manual):")
+    imprimir_tablero(tablero)
+
+    # Mostrar solvencia y decidir
+    explicar_paridad(tablero)
+    if not es_resoluble_4x4(tablero):
+        print("\nSolvencia: NO RESOLUBLE. No se ejecuta BFS.")
+        raise SystemExit(0)
     else:
-        sem = input("Semilla (opcional, Enter para ninguna): ").strip()
-        if sem.isdigit():
-            random.seed(int(sem))
-        estado_inicial = tablero_resoluble_aleatorio()
+        print("\nSolvencia: RESOLUBLE. Procediendo con BFS...")
 
-    print("\nTablero inicial:")
-    imprimir_tablero(estado_inicial)
-    print("\nEstado objetivo (tablero ordenado):")
-    imprimir_tablero(ESTADO_OBJETIVO)
-
-    # Límites operativos
-    # RECOMENDADO:
-    #   TIMEOUT_SEGUNDOS = 30.0   # 15–60 s suele ir bien para k <= ~60
-    #   LIMITE_EXPANSIONES = 10_000_000  # 2–20 M según tu memoria/tiempo
-    try:
-        TIMEOUT_SEGUNDOS = input("Timeout en segundos (Enter=30): ").strip()
-        TIMEOUT_SEGUNDOS = float(TIMEOUT_SEGUNDOS) if TIMEOUT_SEGUNDOS else 30.0
-    except ValueError:
-        TIMEOUT_SEGUNDOS = 30.0
-
-    try:
-        LIMITE_EXPANSIONES = input("Límite de expansiones (Enter=10000000): ").strip()
-        LIMITE_EXPANSIONES = int(LIMITE_EXPANSIONES) if LIMITE_EXPANSIONES else 10_000_000
-    except ValueError:
-        LIMITE_EXPANSIONES = 10_000_000
-
-    print("\nResolviendo con BDS...")
-    camino = busqueda_bidireccional(
-        estado_inicial=estado_inicial,
-        timeout_segundos=TIMEOUT_SEGUNDOS,
-        limite_expansiones=LIMITE_EXPANSIONES
-    )
+    # Ejecutar BFS (con límite de expansiones para evitar cuelgues)
+    camino = bfs(tablero, limite_expansiones=LIMITE_EXPANSIONES_BFS)
 
     if camino is None:
-        print("\nNo se encontró solución dentro de los límites (tiempo/expansiones).")
+        print("\nNo se encontró solución dentro del límite de expansiones "
+            f"({LIMITE_EXPANSIONES_BFS:,}). Considera usar A* o bajar la dificultad.")
     else:
         print(f"\nSolución en {len(camino)} movimientos (óptima).")
         print("Secuencia:", camino)
-        # Reproducción paso a paso automática
-        reproducir_movimientos(estado_inicial, camino, pausa_segundos=0.25)
+        reproducir_movimientos(tablero, camino)
