@@ -1,20 +1,8 @@
-# bds_15puzzle_interactivo.py
 import random
 import time
 from collections import deque
 from typing import Optional, Tuple, List, Dict
 
-# =============================================================================
-# 15-puzzle 4x4 — Búsqueda en Anchura Bidireccional (BDS)
-#
-# * Dificultad controlada por k (mezclas desde el objetivo) o estado aleatorio resoluble.
-# * Límites operativos:
-#     - TIMEOUT_SEGUNDOS: tiempo máximo de búsqueda (recomendado 15–60 s).
-#     - LIMITE_EXPANSIONES: tope de nodos a expandir entre ambos frentes (recomendado 2–20 millones).
-# * Salida sin métricas; al finalizar, se reproduce paso a paso la solución.
-# =============================================================================
-
-# ======== Configuración base ========
 TAMANO_TABLERO: int = 4
 ESTADO_OBJETIVO: Tuple[int, ...] = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS: Tuple[str, ...] = ('arriba', 'abajo', 'izquierda', 'derecha')  # orden determinista
@@ -25,7 +13,6 @@ DESPLAZAMIENTOS: Dict[str, int] = {
     'derecha': 1,
 }
 
-# ======== Utilidades de tablero ========
 def indice_a_fila_columna(indice: int) -> Tuple[int, int]:
     return divmod(indice, TAMANO_TABLERO)
 
@@ -78,7 +65,7 @@ def imprimir_tablero_resaltado(estado: Tuple[int, ...], indice_resaltado: Option
             celdas.append(celda)
         print(' '.join(celdas))
 
-# ======== Solvencia (4x4) ========
+# Solvencia
 def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
     # Validación de contenido {0..15} sin duplicados
     if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO * TAMANO_TABLERO)):
@@ -90,7 +77,7 @@ def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
     fila_cero_desde_abajo = TAMANO_TABLERO - fila_cero_desde_arriba  # 1..4
     return (numero_inversiones + fila_cero_desde_abajo) % 2 == 1
 
-# ======== Generadores de instancias ========
+# Generadores de instancias
 def tablero_resoluble_aleatorio() -> Tuple[int, ...]:
     """Baraja al azar hasta obtener un estado resoluble (sin k)."""
     numeros = list(range(TAMANO_TABLERO * TAMANO_TABLERO))
@@ -117,7 +104,7 @@ def mezclar_desde_objetivo(numero_mezclas: int, semilla: Optional[int] = None) -
         ultimo = m
     return estado
 
-# ======== Reconstrucción de camino ========
+# Reconstrucción de camino 
 def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[int, ...]], Optional[str]]],
                     estado_meta: Tuple[int, ...]) -> List[str]:
     camino: List[str] = []
@@ -129,7 +116,7 @@ def reconstruir_camino(predecesor: Dict[Tuple[int, ...], Tuple[Optional[Tuple[in
     camino.reverse()
     return camino
 
-# ======== Búsqueda Bidireccional (con límites operativos) ========
+# Búsqueda Bidireccional (con límites operativos)
 def busqueda_bidireccional(
     estado_inicial: Tuple[int, ...],
     timeout_segundos: Optional[float],
@@ -215,7 +202,7 @@ def busqueda_bidireccional(
 
     return None  # sin solución dentro de límites (o fronteras vacías)
 
-# ======== Reproducción paso a paso ========
+# Reproducción paso a paso
 def reproducir_movimientos(estado_inicial: Tuple[int, ...], lista_movimientos: List[str], pausa_segundos: float = 0.25) -> None:
     estado = estado_inicial
     print("\nEstado inicial:")
@@ -231,9 +218,8 @@ def reproducir_movimientos(estado_inicial: Tuple[int, ...], lista_movimientos: L
         time.sleep(pausa_segundos)
     print("\nEstado completo finalizado.")
 
-# ======== Main ========
+
 if __name__ == "__main__":
-    print("=== 15-puzzle 4x4 — Búsqueda Bidireccional (BDS) ===")
     print("Generación del tablero inicial:")
     print("  1) Mezclar desde objetivo con k (control de dificultad)")
     print("  2) Aleatorio resoluble")
@@ -259,7 +245,7 @@ if __name__ == "__main__":
     print("\nEstado objetivo (tablero ordenado):")
     imprimir_tablero(ESTADO_OBJETIVO)
 
-    # ===== Límites operativos (recomendaciones en comentario) =====
+    # Límites operativos
     # RECOMENDADO:
     #   TIMEOUT_SEGUNDOS = 30.0   # 15–60 s suele ir bien para k <= ~60
     #   LIMITE_EXPANSIONES = 10_000_000  # 2–20 M según tu memoria/tiempo

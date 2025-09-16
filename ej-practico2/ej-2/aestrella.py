@@ -3,7 +3,6 @@ import heapq
 import time
 from typing import Optional, Tuple, List, Dict, Set
 
-# ======== Configuración ========
 TAMANO_TABLERO: int = 4
 ESTADO_OBJETIVO: Tuple[int, ...] = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS: Tuple[str, ...] = ('arriba', 'abajo', 'izquierda', 'derecha')
@@ -22,7 +21,6 @@ Acerca de numero_mezclas:
 - Importante: por ciclos, la distancia óptima real de regreso NO tiene por qué ser exactamente numero_mezclas.
 """
 
-# ======== Utilidades ========
 def indice_a_fila_columna(indice: int) -> Tuple[int, int]:
     return divmod(indice, TAMANO_TABLERO)
 
@@ -58,7 +56,7 @@ def imprimir_tablero(estado: Tuple[int, ...]) -> None:
         segmento = estado[fila * TAMANO_TABLERO:(fila + 1) * TAMANO_TABLERO]
         print(' '.join(f'{x:2d}' if x != 0 else '  .' for x in segmento))
 
-# ======== Reproducción / Animación en consola ========
+# Animación en consola 
 def imprimir_tablero_resaltado(estado: Tuple[int, ...], indice_resaltado: Optional[int] = None) -> None:
     """Imprime el tablero y resalta (con corchetes) la casilla en indice_resaltado."""
     for fila in range(TAMANO_TABLERO):
@@ -126,7 +124,7 @@ def reproducir_movimientos(
 
     print("\nEstado completo finalizado.")
 
-# ======== Solvencia (4x4) ========
+# Solvencia 
 def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
     # Validación de contenido {0..15} sin duplicados
     if tuple(sorted(estado)) != tuple(range(TAMANO_TABLERO * TAMANO_TABLERO)):
@@ -143,7 +141,7 @@ def es_resoluble_4x4(estado: Tuple[int, ...]) -> bool:
     # Regla 4x4: resoluble ssi (inversiones + fila_hueco_desde_abajo) es impar
     return (numero_inversiones + fila_hueco_desde_abajo) % 2 == 1
 
-# ======== Heurística: Manhattan + Conflicto Lineal ========
+# Heurística: Manhattan + Conflicto Lineal
 def distancia_manhattan(estado: Tuple[int, ...]) -> int:
     distancia_total = 0
     for indice, valor in enumerate(estado):
@@ -185,7 +183,7 @@ def heuristica_mc(estado: Tuple[int, ...]) -> int:
     # Heurística MC (admisible y consistente)
     return distancia_manhattan(estado) + conflicto_lineal(estado)
 
-# ======== Generar instancia a N movimientos del objetivo ========
+# Generar instancia a N movimientos del objetivo 
 def mezclar_desde_objetivo(numero_mezclas: int, semilla: Optional[int] = None) -> Tuple[int, ...]:
     if semilla is not None:
         random.seed(semilla)
@@ -203,7 +201,7 @@ def mezclar_desde_objetivo(numero_mezclas: int, semilla: Optional[int] = None) -
     # Solvencia garantizada por construcción
     return estado
 
-# ======== A* con progreso, MC fija y límite ========
+# A* con progreso, MC fija y límite 
 def a_estrella(
     estado_inicial: Tuple[int, ...],
     imprimir_progreso: bool = True,
@@ -273,16 +271,16 @@ def a_estrella(
 
     return None, expandidos
 
-# ======== Main ========
+
 if __name__ == "__main__":
     print("Generando tablero a N movimientos del objetivo (numero_mezclas).")
     try:
-        numero_mezclas = int(input("Elige numero_mezclas (0–200; p.ej. 25 fácil, 40 medio, 50+ difícil): \n").strip() or "25")
+        numero_mezclas = int(input("\nElige numero_mezclas (0–200; p.ej. 25 fácil, 40 medio, 50+ difícil): ").strip() or "25")
     except ValueError:
         numero_mezclas = 25
     numero_mezclas = max(0, min(200, numero_mezclas))  # limitar a rango razonable
 
-    entrada_semilla = input("Semilla (opcional, enter para ninguna): \n").strip()
+    entrada_semilla = input("\nSemilla (opcional, enter para ninguna): ").strip()
     semilla = int(entrada_semilla) if entrada_semilla.isdigit() else None
 
     estado_inicial = mezclar_desde_objetivo(numero_mezclas, semilla=semilla)
