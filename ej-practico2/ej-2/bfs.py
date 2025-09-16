@@ -144,11 +144,11 @@ def bfs(estado_inicial: Tuple[int, ...],
 def parsear_tablero_estricto(texto: str) -> Optional[Tuple[int, ...]]:
     # Acepta espacios y/o comas como separadores
     tokens = texto.replace(",", " ").split()
-    # ¿Exactamente 16 tokens?
+    # Espera que se ocupen bien los espacios para los 16
     if len(tokens) != TAMANO_TABLERO * TAMANO_TABLERO:
         print(f"\nEntrada inválida: se leyeron {len(tokens)} valores, se requieren {TAMANO_TABLERO*TAMANO_TABLERO}.")
         return None
-    # ¿Todos numéricos?
+    # Espera que se ocupen bien los espacios para los 16
     valores: List[int] = []
     for t in tokens:
         try:
@@ -191,14 +191,13 @@ def pedir_tablero_interactivo() -> Optional[Tuple[int, ...]]:
                 break
             lineas.append(linea)
         if not lineas:
-            # canceló
             return None
         tablero = parsear_tablero_estricto("\n".join(lineas))
         if tablero is not None:
             return tablero
         print("\nEntrada inválida. Intenta de nuevo (o presiona Enter inmediatamente para cancelar).\n")
 
-# ==================== Reproducción paso a paso ====================
+# ------------------------------ Reproducción paso a paso ------------------------------
 def reproducir_movimientos(estado_inicial: Tuple[int, ...],
                         lista_movimientos: List[str],
                         pausa_segundos: float = PAUSA_SEGUNDOS,

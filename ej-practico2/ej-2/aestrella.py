@@ -1,9 +1,8 @@
-# resolver_15puzzle_astar.py
 import heapq
 import time
 from typing import Optional, Tuple, List, Dict, Set
 
-# ==================== Configuración base ====================
+# ------------------------------ Configuración base ------------------------------
 # Tamaño del tablero (4x4 para el 15-puzzle)
 TAMANO_TABLERO: int = 4
 # Estado objetivo: tupla con los números del 1 al 15 y el 0 (hueco) al final
