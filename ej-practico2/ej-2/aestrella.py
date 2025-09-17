@@ -6,9 +6,27 @@ import re
 TAMANO_TABLERO = 4
 ESTADO_OBJETIVO = tuple(list(range(1, TAMANO_TABLERO * TAMANO_TABLERO)) + [0])
 LISTA_MOVIMIENTOS = ('arriba', 'abajo', 'izquierda', 'derecha')
+# Si se dibuja el cuadrado de 4x4, y se realiza las operaciones abajo y arriba, se llega justamente a la posicion buscada.
 DESPLAZAMIENTOS = {'arriba': -TAMANO_TABLERO, 'abajo': TAMANO_TABLERO, 'izquierda': -1, 'derecha': 1}
 POSICION_OBJETIVO = {v: (i // TAMANO_TABLERO, i % TAMANO_TABLERO) for i, v in enumerate(ESTADO_OBJETIVO)}
 
+"""
+Ejemplo posicion objetivo.
+15
+v : fila, columna
+i = 14, v = 15
+15 : (14//4, 14%4)
+15 : (fila: 3, columna: 2)
+15 : (3,2)
+"""
+"""
+    Col0   Col1    Col2    Col3
+    (1,     2,      3,      4,     Fila0
+    5,      6,      7,      8,     Fila1
+    9,      10,     11,     12,    Fila2
+    13,     14,     15,     0)     Fila3
+
+"""
 # Visualización paso a paso
 LIMPIAR_PANTALLA = False   # True => limpia pantalla en cada paso
 PAUSA_SEGUNDOS = 0.35      # pausa entre pasos
@@ -19,9 +37,13 @@ LIMITE_EXPANSIONES = 1_000_000
 
 # ------------------------------ Utilidades de tablero ------------------------------
 def indice_a_fila_columna(indice):
-    return divmod(indice, TAMANO_TABLERO)
+    return divmod(indice, TAMANO_TABLERO) # divmod(indice, 4) -> regresa dos valores divmod(a,b) eso es igual a (a//b,a%b)
+                                        # return (indice//TAMANO_TABLERO,indice%TAMANO_TABLERO) 
+                                        # en realidad return (fila, columna)
 
-def fila_columna_a_indice(fila, columna):
+def fila_columna_a_indice(fila, columna): # recibe (fila, columna)
+                                            # ejemplo (2,2) -> 2 * 4 + 2 = 10
+                                            # indice = 10
     return fila * TAMANO_TABLERO + columna
 
 def movimiento_valido(indice_cero, movimiento):
@@ -32,6 +54,19 @@ def movimiento_valido(indice_cero, movimiento):
     if movimiento == 'derecha':   return columna < TAMANO_TABLERO - 1
     return False
 
+"""
+indice_cero = 10 
+emplea indice_a_fila_columna(indice_cero) -> indice_a_fila_columna(10) 
+indice_a_fila_columna(10) -> return (10//4,10%4) -> return(2,2)
+fila = 2, columna = 2
+VALIDA:
+arriba    ->  2 > 0    -> TRUE
+abajo     ->  2 < 4-1  -> TRUE
+izquierda ->  2 > 0    -> TRUE
+derecha   ->  2 < 4-1  -> TRUE
+
+
+"""
 def aplicar_movimiento(estado, movimiento):
     """Devuelve el nuevo estado al mover el 0; None si no es válido."""
     indice_cero = estado.index(0)
