@@ -20,11 +20,59 @@ def crear_tablero():
         tablero.append(fila)
     return tablero
 
+'''
+n = 4
+i = 0 hasta n-1
+    i=0
+    j = 0 hasta n-1
+
+    j=0
+    fila = []
+    fila.append(' ')
+    fila = [' ']
+
+    j = 1
+    fila.append(' ')
+    fila = [' ',' ']
+    .
+    .
+    .
+    j = 3
+    fila.append('')
+    fila = [' ',' ',' ',' ']
+    
+tablero.append(fila)
+tablero = [[' ',' ',' ',' ']]
+
+    i=1
+    j = 0 hasta n-1
+
+    j=0
+    fila = []
+    fila.append(' ')
+    fila = [' ']
+
+    j = 1
+    fila.append(' ')
+    fila = [' ',' ']
+    .
+    .
+    .
+    j = 3
+    fila.append('')
+    fila = [' ',' ',' ',' ']
+    fila    
+tablero = [[' ',' ',' ',' '], [' ',' ',' ',' ']]
+.
+.
+.
+'''
+
 def mostrar_tablero(tablero):
     # Muestra el tablero en consola
     print("\n   " + " ".join(str(i) for i in range(N)))
-    for i, fila in enumerate(tablero):
-        print(f"{i}  " + " ".join(fila))
+    for i, fila in enumerate(tablero): # enumerate(), regresa indice y valor.
+        print(f"{i}  " + " ".join(fila)) # join() une los elementos de un iterable en una única cadena.
     print()
 
 def movimientos_posibles(tablero):
@@ -32,28 +80,46 @@ def movimientos_posibles(tablero):
     movs = []
     for i in range(N):
         for j in range(N):
-            if tablero[i][j] == ' ':
-                movs.append((i, j))
-    return movs
+            if tablero[i][j] == ' ': # Si la celda [i][j] esta vacia
+                movs.append((i, j))  # Guarda ese valor en movs.
+    return movs                      # Regresa en una lista de tuplas los espacios vacios, indicando la fil y columna.
+'''
+Recordando que crear tablero, returna un tablero que es una lista de listas
+tablero = [
+    ['X',' ','O',' '],
+    [' ','X',' ',' '],
+    [' ',' ','O',' '],
+    [' ',' ',' ',' '],
+]
+Con esto devuelve: [(0,1),(0,3),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,0),(3,1),(3,2),(3,3)]
 
+'''
 def tablero_lleno(tablero):
     # Verifica si el tablero está lleno
     for i in range(N):
         for j in range(N):
             if tablero[i][j] == ' ':
-                return False
-    return True
+                return False        # Si encuentra un espacio el tablero_lleno es falso.
+    return True                     # Si recorre cada fila(i) y columna(j), 
 
 def hay_ganador(tablero, jugador):
-    # Verifica si el jugador ha hecho 4 en línea
+    # Recibe: tablero que es una lista de listas (matriz N×N) con los símbolos 'X', 'O' o ' '.
+    # Recibe: jugador con su carácter, 'X' o 'O', que indica a quién le queremos verificar la victoria
+    # Recorre cada fila i
     for i in range(N):
+        # ------- Comprueba por filas -------
+        # Supone al inicio (fila_gana = True) que toda la fila es del jugador.
         fila_gana = True
+        # Recorre las columnas j de esa fila
         for j in range(N):
+            # Si encuentra una celda distinta, pone fila_gana = False y hace break
             if tablero[i][j] != jugador:
                 fila_gana = False
                 break
         if fila_gana:
             return True
+        
+        # ------- Comprueba por columnas -------
         col_gana = True
         for j in range(N):
             if tablero[j][i] != jugador:
@@ -61,6 +127,20 @@ def hay_ganador(tablero, jugador):
                 break
         if col_gana:
             return True
+        
+    '''
+    columnas→ 0    1    2    3
+    filas
+        0   (0,0)(0,1)(0,2)(0,3)
+        1   (1,0)(1,1)(1,2)(1,3)
+        2   (2,0)(2,1)(2,2)(2,3)
+        3   (3,0)(3,1)(3,2)(3,3)
+    
+        Diagonal principal: De esquina superior izquierda (0,0) hasta la esquina inferior derecha (3,3).
+                            En cada casilla, fila = columna → (i, i)
+        Diagonal secundaria: De esquina superior derecha (0,3) hasta la esquina inferior izquierda (3,0)
+    '''
+    # ------- Comprueba por diagonal (de arriba-izquierda a abajo-derecha): posiciones (0,0), (1,1), (2,2), (3,3) -------
     diag1_gana = True
     for i in range(N):
         if tablero[i][i] != jugador:
@@ -68,9 +148,13 @@ def hay_ganador(tablero, jugador):
             break
     if diag1_gana:
         return True
+    
+    # ------- Comprueba por diagonal (de arriba-derecha a abajo-izquierda): posiciones (0,N-1), (1,N-2), (2,N-3), (3,0) -------
     diag2_gana = True
     for i in range(N):
-        if tablero[i][N-1-i] != jugador:
+        # La fila (i) va subiendo: 0, 1, 2, 3.
+        # La columna va bajando: 3, 2, 1, 0.
+        if tablero[i][N-1-i] != jugador: # La última columna siempre es N-1
             diag2_gana = False
             break
     if diag2_gana:
