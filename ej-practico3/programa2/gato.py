@@ -1,6 +1,6 @@
 import time, random
 
-N = 4                # Tamaño del tablero (4x4)
+N = 3                # Tamaño del tablero (4x4)
 HUM = 'X'            # Símbolo del humano
 AI = 'O'             # Símbolo de la IA
 
