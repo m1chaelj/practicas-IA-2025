@@ -4,7 +4,7 @@ N = 3                # Tamaño del tablero (4x4)
 HUM = 'X'            # Símbolo del humano
 AI = 'O'             # Símbolo de la IA
 
-MAX_TIME_SEC = 1.5   # Tiempo máximo por jugada de la IA (segundos)
+MAX_TIME_SEC = 4.5   # Tiempo máximo por jugada de la IA (segundos)
 MAX_DEPTH = 8        # Profundidad máxima de búsqueda en minimax
 INF = 10**9          # Valor infinito para comparación
 
