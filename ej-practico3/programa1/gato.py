@@ -1,6 +1,6 @@
 import time, random
 
-N = 3                # Tamaño del tablero (4x4)
+N = 4                # Tamaño del tablero (4x4)
 HUM = 'X'            # Símbolo del humano
 AI = 'O'             # Símbolo de la IA
 
@@ -202,7 +202,7 @@ def ordenar_movimientos(movs):
     movs_ordenados = sorted(movs, key=key)
     return movs_ordenados
 
-# Heurística de evaluación
+
 
 # Ponderaciones según cantidad de fichas propias en una línea abierta
 PESO = {0:0, 1:1, 2:4, 3:9}
