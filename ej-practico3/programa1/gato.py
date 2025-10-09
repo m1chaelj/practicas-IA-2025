@@ -181,15 +181,44 @@ for i in range(N):
     diag_secundaria.append((i, N-1-i))
 LINEAS.append(diag_secundaria)     # diagonal secundaria
 
-CENTROS = set()
+'''
+
+Al pre-calcular las 10 líneas ganadoras, la función evaluar no tiene 
+que calcular las coordenadas en cada llamada. Simplemente itera sobre 
+la lista fija de 10 patrones.
+LINEAS = [
+    # Filas
+    [(0, 0), (0, 1), (0, 2), (0, 3)],
+    [(1, 0), (1, 1), (1, 2), (1, 3)],
+    [(2, 0), (2, 1), (2, 2), (2, 3)],
+    [(3, 0), (3, 1), (3, 2), (3, 3)],
+
+    # Columnas
+    [(0, 0), (1, 0), (2, 0), (3, 0)],
+    [(0, 1), (1, 1), (2, 1), (3, 1)],
+    [(0, 2), (1, 2), (2, 2), (3, 2)],
+    [(0, 3), (1, 3), (2, 3), (3, 3)],
+
+    # Diagonales
+    [(0, 0), (1, 1), (2, 2), (3, 3)],
+    [(0, 3), (1, 2), (2, 1), (3, 0)]
+]
+'''
+CENTROS = set() # Devuelve al final CENTROS={(1,1),(1,2),(2,1),(2,2)}
 for i in [1,2]:
     for j in [1,2]:
         CENTROS.add((i,j))
-ESQUINAS = set()
+
+ESQUINAS = set() # Devuelve al final ESQUINAS={(0,0),(0,3),(3,0),(3,3)}
 ESQUINAS.add((0,0))
 ESQUINAS.add((0,N-1))
 ESQUINAS.add((N-1,0))
 ESQUINAS.add((N-1,N-1))
+
+'''
+Definir estas zonas como conjuntos (set) hace que la verificación de 
+si un movimiento es central o de esquina sea casi instantánea (O(1))
+'''
 
 def ordenar_movimientos(movs):
     # Ordena los movimientos priorizando centro y esquinas
@@ -201,7 +230,6 @@ def ordenar_movimientos(movs):
         return 2 + abs(i-1.5) + abs(j-1.5)
     movs_ordenados = sorted(movs, key=key)
     return movs_ordenados
-
 
 
 # Ponderaciones según cantidad de fichas propias en una línea abierta
