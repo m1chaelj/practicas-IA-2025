@@ -220,6 +220,10 @@ Definir estas zonas como conjuntos (set) hace que la verificación de
 si un movimiento es central o de esquina sea casi instantánea (O(1))
 '''
 
+'''
+La funcion ordenar_movimientos usa la Distancia de Manhattan como una heurística de prioridad para 
+los movimientos de borde, para la eficiencia del algoritmo Minimax.
+'''
 def ordenar_movimientos(movs):
     # Ordena los movimientos priorizando centro y esquinas
     def key(m):
@@ -235,6 +239,19 @@ def ordenar_movimientos(movs):
 # Ponderaciones según cantidad de fichas propias en una línea abierta
 PESO = {0:0, 1:1, 2:4, 3:9}
 
+
+'''
+La funcion toma el estado actual del tablero y devuelve un único número 
+que indica qué tan favorable es esa posición para la IA
+
+CASO 1: Si una línea contiene tanto fichas de la IA ('O') como fichas del humano ('X'), se considera bloqueada.
+CASO 2: Para las líneas que no están bloqueadas, se aplica la estrategia exponencial definida en PESO = {0:0, 1:1, 2:4, 3:9}
+
+Si solo hay fichas de la IA (os > 0 y xs = 0), la puntuación del tablero aumenta según el valor de PESO
+Si solo hay fichas del humano (xs > 0 y os = 0), la puntuación del tablero disminuye (se resta) según el valor de PESO
+
+Al final, la suma de todas estas ponderaciones es el puntaje final que Minimax usará para decidir qué tan buena es esa posición
+'''
 def evaluar(tablero):
     # Evalúa el tablero para posiciones no terminales
     puntaje = 0
